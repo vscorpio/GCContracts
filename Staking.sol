@@ -420,46 +420,46 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
         ownerOfDeposit[tokenId] = msg.sender;
 
         if (IERC721(NftAddress).checkIfWorker(tokenId)) {
-            workerMap.set(tokenId, 1);
-            stakedWorkers++;
             IERC721(NftAddress).transferFrom(
                 msg.sender,
                 address(this),
                 tokenId
             );
+            workerMap.set(tokenId, 1);
+            stakedWorkers++;
             emit WOStaked(tokenId, block.timestamp, msg.sender);
             return true;
         }
         if (IERC721(NftAddress).checkIfLandlord(tokenId)) {
-            landlordMap.set(tokenId, 1);
-            stakedLandlords++;
             IERC721(NftAddress).transferFrom(
                 msg.sender,
                 address(this),
                 tokenId
             );
+            landlordMap.set(tokenId, 1);
+            stakedLandlords++;
             emit LLStaked(tokenId, block.timestamp, msg.sender);
             return true;
         }
         if (IERC721(NftAddress).checkIfBusinessOwner(tokenId)) {
-            businessOwnerMap.set(tokenId, 1);
-            stakedBusinessOwners++;
             IERC721(NftAddress).transferFrom(
                 msg.sender,
                 address(this),
                 tokenId
             );
+            businessOwnerMap.set(tokenId, 1);
+            stakedBusinessOwners++;
             emit BOStaked(tokenId, block.timestamp, msg.sender);
             return true;
         }
         if (IERC721(NftAddress).checkIfGangster(tokenId)) {
-            gangsterMap.set(tokenId, 1);
-            stakedGangsters++;
             IERC721(NftAddress).transferFrom(
                 msg.sender,
                 address(this),
                 tokenId
             );
+            gangsterMap.set(tokenId, 1);
+            stakedGangsters++;
             emit GAStaked(tokenId, block.timestamp, msg.sender);
             return true;
         }
