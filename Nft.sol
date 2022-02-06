@@ -48,6 +48,7 @@ contract GangsterCityNFT is RoyaltiesAddon, ERC2981, OnChainProperties, Ownable 
         public
         onlyOwner
     {
+      require(_royaltiesFees >= 1 && royaltiesFees <= 100);
         royaltiesFees = _royaltiesFees;
     }
 
@@ -69,18 +70,26 @@ contract GangsterCityNFT is RoyaltiesAddon, ERC2981, OnChainProperties, Ownable 
     uint256 nftCount = 50000;
     uint256 private royaltiesFees;
 
-    address public ErcAddress;
-    address public StakingAddress;
+    address public ercAddress;
+    address public stakingAddress;
+
+    bool public isMintingEnabled;
+
+    event ErcStakingAddressChanged(address newErcAddress, address newStakingAddress);
+    event MintingEnabledChanged(bool status);
 
     constructor(address ercAddr, address stakingAddr)
         ERC721("Gangster City NFT", "GC-NFT")
         OnChainProperties()
     {
-        StakingAddress = stakingAddr;
-        ErcAddress = ercAddr;
+        stakingAddress = stakingAddr;
+        ercAddress = ercAddr;
     }
 
     address metadataProviderAddress = 0xffF82dd1f43899Aa2F254A4bAFa6c343e97682a7;
+
+    mapping(string => bool) consumedTokenURIs;
+    mapping(uint256 => bool) consumedRandomness;
 
     // Utility function
     function normalSubstring(
@@ -182,22 +191,28 @@ contract GangsterCityNFT is RoyaltiesAddon, ERC2981, OnChainProperties, Ownable 
         destinationWallet.transfer(address(this).balance);
     }
 
-    function withdrawERCBalance(address payable destinationWallet)
+    function withdrawERCBalance(address destinationWallet)
         external
         onlyOwner
     {
         require(destinationWallet != address(0), "Address cannot be the zero-address");
-        IERC20(ErcAddress).transfer(
+        IERC20(ercAddress).transfer(
             destinationWallet,
-            IERC20(ErcAddress).balanceOf(address(this))
+            IERC20(ercAddress).balanceOf(address(this))
         );
     }
 
     function changeErcAndStakingAddr(address ercAddr, address stakingAddr) external onlyOwner {
         require(ercAddr != address(0), "ERC address cannot be the zero-address");
         require(stakingAddr != address(0), "Staking address cannot be the zero-address");
-        ErcAddress = ercAddr;
-        StakingAddress = stakingAddr;
+        ercAddress = ercAddr;
+        stakingAddress = stakingAddr;
+        emit ErcStakingAddressChanged(ercAddr, stakingAddr);
+    }
+
+    function changeMintingEnabled(bool newValue) external onlyOwner {
+        isMintingEnabled = newValue;
+        emit MintingEnabledChanged(newValue);
     }
 
     function strToUint(string memory _str) public pure returns(uint256 res) {
@@ -227,6 +242,9 @@ contract GangsterCityNFT is RoyaltiesAddon, ERC2981, OnChainProperties, Ownable 
         _tokenIds.increment();
 
         require(_tokenIds.current() <= nftCount, "All NFTs have been minted!");
+        require(isMintingEnabled == true);
+        require(consumedTokenURIs[tokenURI] == false);
+        require(consumedRandomness[randomness] == false);
 
         if (_tokenIds.current() >= 1 && _tokenIds.current() <= 10000) {
             require(
@@ -236,7 +254,7 @@ contract GangsterCityNFT is RoyaltiesAddon, ERC2981, OnChainProperties, Ownable 
         } else if (
             _tokenIds.current() >= 10001 && _tokenIds.current() <= 20000
         ) {
-            IERC20(ErcAddress).transferFrom(
+            IERC20(ercAddress).transferFrom(
                 msg.sender,
                 address(this),
                 10000 * 10**18
@@ -244,7 +262,7 @@ contract GangsterCityNFT is RoyaltiesAddon, ERC2981, OnChainProperties, Ownable 
         } else if (
             _tokenIds.current() >= 20001 && _tokenIds.current() <= 40000
         ) {
-            IERC20(ErcAddress).transferFrom(
+            IERC20(ercAddress).transferFrom(
                 msg.sender,
                 address(this),
                 20000 * 10**18
@@ -252,7 +270,7 @@ contract GangsterCityNFT is RoyaltiesAddon, ERC2981, OnChainProperties, Ownable 
         } else if (
             _tokenIds.current() >= 40001 && _tokenIds.current() <= 50000
         ) {
-            IERC20(ErcAddress).transferFrom(
+            IERC20(ercAddress).transferFrom(
                 msg.sender,
                 address(this),
                 40000 * 10**18
@@ -270,12 +288,15 @@ contract GangsterCityNFT is RoyaltiesAddon, ERC2981, OnChainProperties, Ownable 
         uint256 shouldTransferToGangster = strToUint(normalSubstring(tokenURI, 0, 1)); // first number in the signed message (0 - do not transfer | 1 - transfer)
         uint256 selectedClass = strToUint(normalSubstring(tokenURI, 1, 2)); // second number in the signed message (1 - worker | 2 - landlord | 3 - business owner | 4 - gangster)
 
+        require(shouldTransferToGangster >= 1 && shouldTransferToGangster <= 2);
+        require(selectedClass >= 1 && selectedClass <= 4);
+
         if (selectedClass == 1) isWorker[newItemId] = true;
         if (selectedClass == 2) isLandlord[newItemId] = true;
         if (selectedClass == 3) isBusinessOwner[newItemId] = true;
         if (selectedClass == 4) isGangster[newItemId] = true;
 
-        address randomGangsterAddress = StakingInterface(StakingAddress).getRandomStakedGangsterOwnerAddr(randomness, v2, r2, s2);
+        address randomGangsterAddress = StakingInterface(stakingAddress).getRandomStakedGangsterOwnerAddr(randomness, v2, r2, s2);
 
         if(_tokenIds.current() > 10000 && shouldTransferToGangster == 1 && randomGangsterAddress != address(0))
         {
@@ -287,6 +308,9 @@ contract GangsterCityNFT is RoyaltiesAddon, ERC2981, OnChainProperties, Ownable 
             _mint(msg.sender, newItemId);
             _setTokenURI(newItemId, formattedMetadataURI);
         }
+
+        consumedTokenURIs[tokenURI] = true;
+        consumedRandomness[randomness] = true;
 
         return newItemId;
     }
