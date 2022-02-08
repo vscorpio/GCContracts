@@ -264,7 +264,10 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) internal pure returns (address signer) {
+    ) internal returns (address signer) {
+
+      require(consumedRandomness[message] == false);
+      
         // The message header; we will fill in the length next
         string memory header = "\x19Ethereum Signed Message:\n000000";
         uint256 lengthOffset;
@@ -319,6 +322,7 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
         }
         // Perform the elliptic curve recover operation
         bytes32 check = keccak256(abi.encodePacked(header, message));
+        consumedRandomness[message] = true;
         return ecrecover(check, v, r, s);
     }
 
@@ -356,6 +360,7 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
     mapping(uint256 => uint256) lastClaimedReward;
     mapping(uint256 => uint256) public tokenIdReward;
     mapping(uint256 => address) public ownerOfDeposit;
+    mapping(string => bool) consumedRandomness;
 
     // Events
 
@@ -409,7 +414,7 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external view returns (address) {
+    ) external returns (address) {
         string memory randomnessString = uint2str(randomness);
 
         if (verifyRandomness(randomnessString, v, r, s) != randomnessProviderV1)
@@ -594,10 +599,9 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
 
         string memory randomnessString = uint2str(randomness);
 
-
+        if (ownerOfDeposit[tokenId] != msg.sender) revert Unauthorized();
         if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
             revert Unauthorized();
-
         if (IERC721(nftAddress).checkIfWorker(tokenId) != true)
             revert Unauthorized();
         if (verifyRandomness(randomnessString, v, r, s) != randomnessProviderV1)
@@ -744,6 +748,7 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
         uint256 returnedMsgNumber = 1;
         string memory randomnessString = uint2str(randomness);
 
+        if (ownerOfDeposit[tokenId] != msg.sender) revert Unauthorized();
 
         if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
             revert Unauthorized();
@@ -765,7 +770,6 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
 
         stakedLandlords--;
         landlordMap.remove(tokenId);
-
 
         if (finalLandlordReward < 25000 * 1 ether) revert InsufficientFunds();
         uint256 chance = (randomness % 100) + 1;
@@ -850,7 +854,6 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
         bytes32 s,
         uint256 tokenId
     ) external returns (uint256) {
-
         if (hasContractAwardedAllTokens()) revert AllTokensAwarded();
 
         uint256 returnedMsgNumber = 1;
@@ -911,6 +914,8 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
         uint256 returnedMsgNumber = 1;
 
         string memory randomnessString = uint2str(randomness);
+
+        if (ownerOfDeposit[tokenId] != msg.sender) revert Unauthorized();
 
         if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
             revert Unauthorized();
@@ -1024,7 +1029,6 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
         bytes32 s,
         uint256 tokenId
     ) external returns (uint256) {
-
         if (hasContractAwardedAllTokens()) revert AllTokensAwarded();
 
         uint256 returnedMsgNumber = 1;
@@ -1032,6 +1036,8 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
         uint256 chance = (randomness % 100) + 1;
 
         string memory randomnessString = uint2str(randomness);
+
+        
 
         if (IERC721(nftAddress).checkIfGangster(tokenId) != true)
             revert Unauthorized();
@@ -1064,12 +1070,13 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
         bytes32 s,
         uint256 tokenId
     ) external returns (bool) {
-
         uint256 returnedMsgNumber = 2;
         uint256 finalGangsterReward = tokenIdReward[tokenId];
         uint256 chance = (randomness % 100) + 1;
 
         string memory randomnessString = uint2str(randomness);
+
+        if (ownerOfDeposit[tokenId] != msg.sender) revert Unauthorized();
 
         if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
             revert Unauthorized();
