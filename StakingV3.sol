@@ -1,0 +1,1246 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.10;
+
+error InsufficientFunds();
+error Unauthorized();
+error AllTokensAwarded();
+
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+library IterableMapping {
+    // Iterable mapping from address to uint;
+    struct Map {
+        uint256[] keys;
+        mapping(uint256 => uint256) values;
+        mapping(uint256 => uint256) indexOf;
+        mapping(uint256 => bool) inserted;
+    }
+
+    function get(Map storage map, uint256 key) public view returns (uint256) {
+        return map.values[key];
+    }
+
+    function getKeyAtIndex(Map storage map, uint256 index)
+        public
+        view
+        returns (uint256)
+    {
+        return map.keys[index];
+    }
+
+    function size(Map storage map) public view returns (uint256) {
+        return map.keys.length;
+    }
+
+    function set(
+        Map storage map,
+        uint256 key,
+        uint256 val
+    ) public {
+        if (map.inserted[key]) {
+            map.values[key] = val;
+        } else {
+            map.inserted[key] = true;
+            map.values[key] = val;
+            map.indexOf[key] = map.keys.length;
+            map.keys.push(key);
+        }
+    }
+
+    function remove(Map storage map, uint256 key) public {
+        if (!map.inserted[key]) {
+            return;
+        }
+
+        delete map.inserted[key];
+        delete map.values[key];
+
+        uint256 index = map.indexOf[key];
+        uint256 lastIndex = map.keys.length - 1;
+        uint256 lastKey = map.keys[lastIndex];
+
+        map.indexOf[lastKey] = index;
+        delete map.indexOf[key];
+
+        map.keys[index] = lastKey;
+        map.keys.pop();
+    }
+}
+
+interface IERC721 is IERC165 {
+    /**
+     * @dev Emitted when `tokenId` token is transferred from `from` to `to`.
+     */
+    event Transfer(
+        address indexed from,
+        address indexed to,
+        uint256 indexed tokenId
+    );
+
+    /**
+     * @dev Emitted when `owner` enables `approved` to manage the `tokenId` token.
+     */
+    event Approval(
+        address indexed owner,
+        address indexed approved,
+        uint256 indexed tokenId
+    );
+
+    /**
+     * @dev Emitted when `owner` enables or disables (`approved`) `operator` to manage all of its assets.
+     */
+    event ApprovalForAll(
+        address indexed owner,
+        address indexed operator,
+        bool approved
+    );
+
+    /**
+     * @dev Returns the number of tokens in ``owner``'s account.
+     */
+    function balanceOf(address owner) external view returns (uint256 balance);
+
+    /**
+     * @dev Returns the owner of the `tokenId` token.
+     *
+     * Requirements:
+     *
+     * - `tokenId` must exist.
+     */
+    function ownerOf(uint256 tokenId) external view returns (address owner);
+
+    /**
+     * @dev Safely transfers `tokenId` token from `from` to `to`, checking first that contract recipients
+     * are aware of the ERC721 protocol to prevent tokens from being forever locked.
+     *
+     * Requirements:
+     *
+     * - `from` cannot be the zero address.
+     * - `to` cannot be the zero address.
+     * - `tokenId` token must exist and be owned by `from`.
+     * - If the caller is not `from`, it must be have been allowed to move this token by either {approve} or {setApprovalForAll}.
+     * - If `to` refers to a smart contract, it must implement {IERC721Receiver-onERC721Received}, which is called upon a safe transfer.
+     *
+     * Emits a {Transfer} event.
+     */
+    function safeTransferFrom(
+        address from,
+        address to,
+        uint256 tokenId
+    ) external;
+
+    /**
+     * @dev Transfers `tokenId` token from `from` to `to`.
+     *
+     * WARNING: Usage of this method is discouraged, use {safeTransferFrom} whenever possible.
+     *
+     * Requirements:
+     *
+     * - `from` cannot be the zero address.
+     * - `to` cannot be the zero address.
+     * - `tokenId` token must be owned by `from`.
+     * - If the caller is not `from`, it must be approved to move this token by either {approve} or {setApprovalForAll}.
+     *
+     * Emits a {Transfer} event.
+     */
+    function transferFrom(
+        address from,
+        address to,
+        uint256 tokenId
+    ) external;
+
+    /**
+     * @dev Gives permission to `to` to transfer `tokenId` token to another account.
+     * The approval is cleared when the token is transferred.
+     *
+     * Only a single account can be approved at a time, so approving the zero address clears previous approvals.
+     *
+     * Requirements:
+     *
+     * - The caller must own the token or be an approved operator.
+     * - `tokenId` must exist.
+     *
+     * Emits an {Approval} event.
+     */
+    function approve(address to, uint256 tokenId) external;
+
+    function checkIfWorker(uint256 tokenId) external view returns (bool);
+
+    function checkIfLandlord(uint256 tokenId) external view returns (bool);
+
+    function checkIfBusinessOwner(uint256 tokenId) external view returns (bool);
+
+    function checkIfGangster(uint256 tokenId) external view returns (bool);
+
+    /**
+     * @dev Returns the account approved for `tokenId` token.
+     *
+     * Requirements:
+     *
+     * - `tokenId` must exist.
+     */
+    function getApproved(uint256 tokenId)
+        external
+        view
+        returns (address operator);
+
+    /**
+     * @dev Approve or remove `operator` as an operator for the caller.
+     * Operators can call {transferFrom} or {safeTransferFrom} for any token owned by the caller.
+     *
+     * Requirements:
+     *
+     * - The `operator` cannot be the caller.
+     *
+     * Emits an {ApprovalForAll} event.
+     */
+    function setApprovalForAll(address operator, bool _approved) external;
+
+    /**
+     * @dev Returns if the `operator` is allowed to manage all of the assets of `owner`.
+     *
+     * See {setApprovalForAll}
+     */
+    function isApprovedForAll(address owner, address operator)
+        external
+        view
+        returns (bool);
+
+    /**
+     * @dev Safely transfers `tokenId` token from `from` to `to`.
+     *
+     * Requirements:
+     *
+     * - `from` cannot be the zero address.
+     * - `to` cannot be the zero address.
+     * - `tokenId` token must exist and be owned by `from`.
+     * - If the caller is not `from`, it must be approved to move this token by either {approve} or {setApprovalForAll}.
+     * - If `to` refers to a smart contract, it must implement {IERC721Receiver-onERC721Received}, which is called upon a safe transfer.
+     *
+     * Emits a {Transfer} event.
+     */
+    function safeTransferFrom(
+        address from,
+        address to,
+        uint256 tokenId,
+        bytes calldata data
+    ) external;
+}
+
+contract GangsterCityStaking is IERC721Receiver, Ownable {
+    // Utility function
+    function uint2str(uint256 _i)
+        internal
+        pure
+        returns (string memory _uintAsString)
+    {
+        if (_i == 0) {
+            return "0";
+        }
+        uint256 j = _i;
+        uint256 len;
+        while (j != 0) {
+            len++;
+            j /= 10;
+        }
+        bytes memory bstr = new bytes(len);
+        uint256 k = len;
+        while (_i != 0) {
+            k = k - 1;
+            uint8 temp = (48 + uint8(_i - (_i / 10) * 10));
+            bytes1 b1 = bytes1(temp);
+            bstr[k] = b1;
+            _i /= 10;
+        }
+        return string(bstr);
+    }
+
+    // Randomness verification (ecrecover)
+    function verifyRandomness(
+        string memory message,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) internal returns (address signer) {
+
+      require(consumedRandomness[message] == false);
+      
+        // The message header; we will fill in the length next
+        string memory header = "\x19Ethereum Signed Message:\n000000";
+        uint256 lengthOffset;
+        uint256 length;
+        assembly {
+            // The first word of a string is its length
+            length := mload(message)
+            // The beginning of the base-10 message length in the prefix
+            lengthOffset := add(header, 57)
+        }
+        // Maximum length we support
+        require(length <= 999999);
+        // The length of the message's length in base-10
+        uint256 lengthLength = 0;
+        // The divisor to get the next left-most message length digit
+        uint256 divisor = 100000;
+        // Move one digit of the message length to the right at a time
+        while (divisor != 0) {
+            // The place value at the divisor
+            uint256 digit = length / divisor;
+            if (digit == 0) {
+                // Skip leading zeros
+                if (lengthLength == 0) {
+                    divisor /= 10;
+                    continue;
+                }
+            }
+            // Found a non-zero digit or non-leading zero digit
+            lengthLength++;
+            // Remove this digit from the message length's current value
+            length -= digit * divisor;
+            // Shift our base-10 divisor over
+            divisor /= 10;
+
+            // Convert the digit to its ASCII representation (man ascii)
+            digit += 0x30;
+            // Move to the next character and write the digit
+            lengthOffset++;
+            assembly {
+                mstore8(lengthOffset, digit)
+            }
+        }
+        // The null string requires exactly 1 zero (unskip 1 leading 0)
+        if (lengthLength == 0) {
+            lengthLength = 1 + 0x19 + 1;
+        } else {
+            lengthLength += 1 + 0x19;
+        }
+        // Truncate the tailing zeros from the header
+        assembly {
+            mstore(header, lengthLength)
+        }
+        // Perform the elliptic curve recover operation
+        bytes32 check = keccak256(abi.encodePacked(header, message));
+        consumedRandomness[message] = true;
+        return ecrecover(check, v, r, s);
+    }
+
+    function hasContractAwardedAllTokens() internal view returns (bool) {
+        if (tokensAwarded >= tokensToAward) return true;
+        else return false;
+    }
+
+    //ERC721 fallback
+
+    function onERC721Received(
+        address,
+        address,
+        uint256,
+        bytes memory
+    ) public virtual override returns (bytes4) {
+        return this.onERC721Received.selector;
+    }
+
+    address public ercAddress;
+    address public nftAddress;
+
+    constructor(address ercAddr, address nftAddr) {
+        ercAddress = ercAddr;
+        nftAddress = nftAddr;
+    }
+
+    using IterableMapping for IterableMapping.Map;
+
+    IterableMapping.Map private workerMap;
+    IterableMapping.Map private landlordMap;
+    IterableMapping.Map private businessOwnerMap;
+    IterableMapping.Map private gangsterMap;
+
+    mapping(uint256 => uint256) lastClaimedReward;
+    mapping(uint256 => uint256) public tokenIdReward;
+    mapping(uint256 => address) public ownerOfDeposit;
+    mapping(string => bool) consumedRandomness;
+
+    // Events
+
+    event WOStaked(uint256 tokenId, uint256 timestamp, address owner);
+    event LLStaked(uint256 tokenId, uint256 timestamp, address owner);
+    event BOStaked(uint256 tokenId, uint256 timestamp, address owner);
+    event GAStaked(uint256 tokenId, uint256 timestamp, address owner);
+
+    event WOUnstaked(uint256 tokenId, uint256 timestamp, address owner);
+    event LLUnstaked(uint256 tokenId, uint256 timestamp, address owner);
+    event BOUnstaked(uint256 tokenId, uint256 timestamp, address owner);
+    event GAUnstaked(uint256 tokenId, uint256 timestamp, address owner);
+
+    event EtherJsLogger(uint256 messageNumber, uint256 value);
+
+    event StakingEnabledChanged(bool newValue);
+    event ErcNftAddressChanged(address _newErcAddress, address _newNftAddress);
+
+    uint256 public stakedWorkers;
+    uint256 public stakedLandlords;
+    uint256 public stakedBusinessOwners;
+    uint256 public stakedGangsters;
+
+    address randomnessProviderV2 = 0x73C897dDA685fc79D18158B11Bcf098d81bd29C1;  // ORACLE ADDR - CAN SEND RANDOMENSS AND EXECUTE
+    //address randomnessProviderV2 = 0x5B38Da6a701c568545dCfcB03FcB875f56beddC4;
+
+    uint256 constant dayTimeInSeconds = 1 days;
+
+
+    uint256 public constant tokensToAward = 3000000000 ether; //3B $CASH TOKENS
+    uint256 public tokensAwarded = 0;
+
+    bool isStakingEnabled = true;
+
+    struct Request {
+        uint256 id;
+        uint256 tokenId;
+        uint256 generatedRandomness;
+        bool isFullfilled;
+    }
+
+    Request[] public unstakeWORequestQueue;
+    Request[] public unstakeLLRequestQueue;
+    Request[] public unstakeBORequestQueue;
+    Request[] public unstakeGARequestQueue;
+    Request[] public claimBORequestQueue;
+    Request[] public claimGARequestQueue;
+
+    event WOUnstakeRequest(uint256 requestId, uint256 tokenId);
+    event LLUnstakeRequest(uint256 requestId, uint256 tokenId);
+    event BOUnstakeRequest(uint256 requestId, uint256 tokenId);
+    event GAUnstakeRequest(uint256 requestId, uint256 tokenId);
+
+    event BOClaimRequest(uint256 requestId, uint256 tokenId);
+    event GAClaimRequest(uint256 requestId, uint256 tokenId);
+
+ 
+
+    // EXECUTE UNSTAKE REQUEST FUNCTIONS
+
+    function executeWOUnstakeRequest(uint256 requestId, uint256 randomness) external returns (bool) {
+
+        uint256 finalWorkerReward = getWorkerTimeLockReward(unstakeWORequestQueue[requestId].tokenId);
+        uint256 returnedMsgNumber = 1;
+
+        if(msg.sender != randomnessProviderV2) revert Unauthorized();
+        if(unstakeWORequestQueue[requestId].isFullfilled == true) revert Unauthorized();
+
+        stakedWorkers--;
+        workerMap.remove(unstakeWORequestQueue[requestId].tokenId);
+
+        if (finalWorkerReward < 10000 * 1 ether) revert InsufficientFunds();
+        uint256 chance = (randomness % 100) + 1;
+
+        // 5% chance for income to be split among all landlords
+        if ((chance >= 1 && chance <= 5))
+            if (stakedLandlords > 0) {
+                uint256 eachLandlordCut = finalWorkerReward / (stakedLandlords);
+                finalWorkerReward = 0;
+                returnedMsgNumber = 2;
+                if (stakedLandlords == 1) {
+                    tokenIdReward[landlordMap.getKeyAtIndex(0)] += eachLandlordCut;
+                } else {
+                    for (uint256 i = 0; i <= stakedLandlords - 1; i++) {
+                        tokenIdReward[landlordMap.getKeyAtIndex(i)] += eachLandlordCut;
+                    }
+                }
+            }
+
+        // 10% chance for income to be split among all BO
+        if ((chance >= 6 && chance <= 15))
+            if (stakedBusinessOwners > 0) {
+                returnedMsgNumber = 3;
+                uint256 eachBusinessOwnerCut = finalWorkerReward /
+                    (stakedBusinessOwners);
+                finalWorkerReward = 0;
+                if (stakedBusinessOwners == 1) {
+            
+                    tokenIdReward[businessOwnerMap.getKeyAtIndex(0)] += eachBusinessOwnerCut;
+                } else {
+                    for (uint256 i = 0; i <= stakedBusinessOwners - 1; i++) {
+                    
+                        tokenIdReward[businessOwnerMap.getKeyAtIndex(i)] += eachBusinessOwnerCut;
+                    }
+                }
+            }
+
+        // 20% chance for income to be split among all GA
+        if ((chance >= 16 && chance <= 35))
+            if (stakedGangsters > 0) {
+                returnedMsgNumber = 4;
+                uint256 eachGangsterCut = finalWorkerReward / (stakedGangsters);
+                finalWorkerReward = 0;
+                if (stakedGangsters == 1) {
+                    tokenIdReward[gangsterMap.getKeyAtIndex(0)] += eachGangsterCut;
+                } else {
+                    for (uint256 i = 0; i <= stakedGangsters - 1; i++) {
+                        tokenIdReward[gangsterMap.getKeyAtIndex(i)] += eachGangsterCut;
+                    }
+                }
+            }
+
+        // 15% chance for all tokens to get burned
+        if ((chance >= 36 && chance <= 50)) {
+            IERC20(ercAddress).transfer(address(0), finalWorkerReward);
+            finalWorkerReward = 0;
+            returnedMsgNumber = 5;
+        }
+
+        if (finalWorkerReward != 0) {
+            tokenIdReward[unstakeWORequestQueue[requestId].tokenId] = 0;
+            lastClaimedReward[unstakeWORequestQueue[requestId].tokenId] = block.timestamp;
+            tokensAwarded += finalWorkerReward;
+            IERC20(ercAddress).transfer(ownerOfDeposit[unstakeWORequestQueue[requestId].tokenId], finalWorkerReward);   
+        }
+
+        IERC721(nftAddress).safeTransferFrom(
+                address(this),
+                ownerOfDeposit[unstakeWORequestQueue[requestId].tokenId],
+                unstakeWORequestQueue[requestId].tokenId
+            );
+
+        emit EtherJsLogger(returnedMsgNumber, finalWorkerReward);
+        emit WOUnstaked(unstakeWORequestQueue[requestId].tokenId, block.timestamp, ownerOfDeposit[unstakeWORequestQueue[requestId].tokenId]);     
+        unstakeWORequestQueue[requestId].isFullfilled = true;
+
+        return true;
+
+    }
+
+    function executeLLUnstakeRequest(uint256 requestId, uint256 randomness) external returns (bool) {
+        uint256 returnedMsgNumber = 1 ;
+        if(msg.sender != randomnessProviderV2) revert Unauthorized();
+        if(unstakeLLRequestQueue[requestId].isFullfilled == true) revert Unauthorized();
+
+        uint256 finalLandlordReward = tokenIdReward[unstakeLLRequestQueue[requestId].tokenId];
+
+        stakedLandlords--;
+        landlordMap.remove(unstakeLLRequestQueue[requestId].tokenId);
+
+        if (finalLandlordReward < 25000 * 1 ether) revert InsufficientFunds();
+        uint256 chance = (randomness % 100) + 1;
+        bool hasLostNft = false;
+
+        // 15% chance for token burn
+        if ((chance >= 1 && chance <= 15)) {
+            IERC20(ercAddress).transfer(address(0), finalLandlordReward);
+            finalLandlordReward = 0;
+            returnedMsgNumber = 2;
+        }
+
+        // 10% chance for income to be split among all GA
+        if ((chance >= 16 && chance <= 25))
+            if (stakedGangsters > 0) {
+                returnedMsgNumber = 3;
+                uint256 eachGangsterCut = finalLandlordReward /
+                    (stakedGangsters);
+                finalLandlordReward = 0;
+                if (stakedGangsters == 1) {
+                    
+                    tokenIdReward[gangsterMap.getKeyAtIndex(0)] += eachGangsterCut;
+                } else {
+                    for (uint256 i = 0; i <= stakedGangsters - 1; i++) {
+                        
+                        tokenIdReward[gangsterMap.getKeyAtIndex(i)] += eachGangsterCut;
+                    }
+                }
+            }
+
+        // 2% chance for NFT to be rewarded among a random gangster
+        if ((chance >= 26 && chance <= 27))
+            if (stakedGangsters > 0) {
+                returnedMsgNumber = 4;
+                if (stakedGangsters == 1) {
+                    hasLostNft = true;
+                    
+                    IERC721(nftAddress).safeTransferFrom(
+                        address(this),
+                        ownerOfDeposit[gangsterMap.getKeyAtIndex(0)],
+                        unstakeLLRequestQueue[requestId].tokenId
+                    );
+                } else {
+                    hasLostNft = true;
+     
+                    IERC721(nftAddress).safeTransferFrom(
+                        address(this),
+                        ownerOfDeposit[gangsterMap.getKeyAtIndex(
+                        (randomness %
+                        stakedGangsters) + 1
+                    )],
+                        unstakeLLRequestQueue[requestId].tokenId
+                    );
+                }
+            }
+
+        if (hasLostNft == false) {
+            IERC721(nftAddress).safeTransferFrom(
+                address(this),
+                ownerOfDeposit[unstakeLLRequestQueue[requestId].tokenId],
+                unstakeLLRequestQueue[requestId].tokenId
+            );
+        }
+
+        if (finalLandlordReward != 0) {
+            lastClaimedReward[unstakeLLRequestQueue[requestId].tokenId] = block.timestamp;
+            tokenIdReward[unstakeLLRequestQueue[requestId].tokenId] = 0;
+            tokensAwarded += finalLandlordReward;
+            IERC20(ercAddress).transfer(ownerOfDeposit[unstakeLLRequestQueue[requestId].tokenId], finalLandlordReward);
+        }
+
+        emit EtherJsLogger(returnedMsgNumber, finalLandlordReward);
+        emit LLUnstaked(unstakeLLRequestQueue[requestId].tokenId, block.timestamp, ownerOfDeposit[unstakeLLRequestQueue[requestId].tokenId]);
+
+        unstakeLLRequestQueue[requestId].isFullfilled = true;
+
+        return true;
+
+    }
+
+    function executeBOUnstakeRequest(uint256 requestId, uint256 randomness) external returns (bool) {
+        if(msg.sender != randomnessProviderV2) revert Unauthorized();
+        if(unstakeBORequestQueue[requestId].isFullfilled == true) revert Unauthorized();
+
+        uint256 finalBusinessOwnerReward = tokenIdReward[unstakeBORequestQueue[requestId].tokenId];
+        uint256 returnedMsgNumber = 1;
+
+
+        stakedBusinessOwners--;
+        businessOwnerMap.remove(unstakeBORequestQueue[requestId].tokenId);
+
+
+        uint256 chance = (randomness % 100) + 1;
+
+        bool hasLostNft = false;
+        bool haveTokensBurned = false;
+
+        // 10% chance for token burn
+        if ((chance >= 1 && chance <= 10)) {
+            haveTokensBurned = true;
+            IERC20(ercAddress).transfer(address(0), finalBusinessOwnerReward);
+            finalBusinessOwnerReward = 0;
+            returnedMsgNumber = 2;
+        }
+
+        // 5% chance for income to be split among gangsters
+        if ((chance >= 11 && chance <= 15))
+            if (stakedGangsters > 0) {
+                returnedMsgNumber = 3;
+                uint256 eachGangsterCut = finalBusinessOwnerReward /
+                    (stakedGangsters);
+                finalBusinessOwnerReward = 0;
+                if (stakedGangsters == 1) {
+                    
+                    tokenIdReward[gangsterMap.getKeyAtIndex(0)] += eachGangsterCut;
+                } else {
+                    for (uint256 i = 0; i <= stakedGangsters - 1; i++) {
+                        
+                        tokenIdReward[gangsterMap.getKeyAtIndex(i)] += eachGangsterCut;
+                    }
+                }
+            }
+
+        // 1% chance for NFT to be rewarded among a random gangster
+        if (chance == 16)
+            if (stakedGangsters > 0) {
+                returnedMsgNumber = 4;
+                if (stakedGangsters == 1) {
+                    hasLostNft = true;
+                    
+                    IERC721(nftAddress).safeTransferFrom(
+                        address(this),
+                        ownerOfDeposit[gangsterMap.getKeyAtIndex(0)],
+                        unstakeBORequestQueue[requestId].tokenId
+                    );
+                } else {
+                    hasLostNft = true;
+                    
+                    IERC721(nftAddress).safeTransferFrom(
+                        address(this),
+                        ownerOfDeposit[(gangsterMap.getKeyAtIndex(
+                        randomness %
+                        stakedGangsters) + 1)
+                    ],
+                        unstakeBORequestQueue[requestId].tokenId
+                    );
+                }
+            }
+
+        //85% chance to unstake and claim token
+
+        if (hasLostNft == false)
+            IERC721(nftAddress).safeTransferFrom(
+                address(this),
+                ownerOfDeposit[unstakeBORequestQueue[requestId].tokenId],
+                unstakeBORequestQueue[requestId].tokenId
+            );
+
+        if (finalBusinessOwnerReward != 0 && haveTokensBurned == false) {
+            lastClaimedReward[unstakeBORequestQueue[requestId].tokenId] = block.timestamp;
+            tokenIdReward[unstakeBORequestQueue[requestId].tokenId] = 0;
+            tokensAwarded += finalBusinessOwnerReward;
+            IERC20(ercAddress).transfer(ownerOfDeposit[unstakeBORequestQueue[requestId].tokenId], finalBusinessOwnerReward);
+        }
+
+        emit EtherJsLogger(returnedMsgNumber, finalBusinessOwnerReward);
+        emit BOUnstaked(unstakeBORequestQueue[requestId].tokenId, block.timestamp, ownerOfDeposit[unstakeBORequestQueue[requestId].tokenId]);
+
+        unstakeBORequestQueue[requestId].isFullfilled = true;
+        return true;
+    }
+
+    function executeGAUnstakeRequest(uint256 requestId, uint256 randomness) external returns (bool) {
+        if(msg.sender != randomnessProviderV2) revert Unauthorized();
+        if(unstakeGARequestQueue[requestId].isFullfilled == true) revert Unauthorized();
+
+        uint256 returnedMsgNumber = 2;
+        uint256 finalGangsterReward = tokenIdReward[unstakeGARequestQueue[requestId].tokenId];
+
+        uint256 chance = (randomness % 100) + 1;
+
+        stakedGangsters--;
+        gangsterMap.remove(unstakeGARequestQueue[requestId].tokenId);
+
+        if (hasContractAwardedAllTokens()) {
+            IERC721(nftAddress).safeTransferFrom(
+                address(this),
+                ownerOfDeposit[unstakeGARequestQueue[requestId].tokenId],
+                unstakeGARequestQueue[requestId].tokenId
+            );
+            emit GAUnstaked(unstakeGARequestQueue[requestId].tokenId, block.timestamp, ownerOfDeposit[unstakeGARequestQueue[requestId].tokenId]);
+            return true;
+        }
+
+        if (finalGangsterReward < 75000 * 1 ether) revert InsufficientFunds();
+
+        if ((chance >= 1 && chance <= 75)) {
+            finalGangsterReward = 0;
+            returnedMsgNumber = 1;
+        }
+
+        if (finalGangsterReward != 0) {
+            tokenIdReward[unstakeGARequestQueue[requestId].tokenId] = 0;
+            lastClaimedReward[unstakeGARequestQueue[requestId].tokenId] = block.timestamp;
+            tokensAwarded += finalGangsterReward;
+            IERC20(ercAddress).transfer(ownerOfDeposit[unstakeGARequestQueue[requestId].tokenId], finalGangsterReward);
+        }
+
+        IERC721(nftAddress).safeTransferFrom(
+            address(this),
+            ownerOfDeposit[unstakeGARequestQueue[requestId].tokenId],
+            unstakeGARequestQueue[requestId].tokenId
+        );
+
+        emit EtherJsLogger(returnedMsgNumber, finalGangsterReward);
+        emit GAUnstaked(unstakeGARequestQueue[requestId].tokenId, block.timestamp, ownerOfDeposit[unstakeGARequestQueue[requestId].tokenId]);
+
+        unstakeGARequestQueue[requestId].isFullfilled = true;
+        return true;
+    }
+
+
+    // EXECUTE CLAIM REQUEST FUNCTIONS
+
+    function executeBOClaimRequest(uint256 requestId, uint256 randomness) external returns (bool) {
+        if(msg.sender != randomnessProviderV2) revert Unauthorized();
+        if(claimBORequestQueue[requestId].isFullfilled == true) revert Unauthorized();
+        uint256 finalBusinessOwnerReward = tokenIdReward[claimBORequestQueue[requestId].tokenId];
+        uint256 returnedMsgNumber = 1;
+        uint256 chance = (randomness % 100) + 1;
+        
+        // Distribute Gangster cut 5%
+        if (stakedGangsters > 0) {
+            uint256 gangsterBonus = (finalBusinessOwnerReward * (5)) / (100);
+            uint256 eachGangsterCut = gangsterBonus / (stakedGangsters);
+            finalBusinessOwnerReward -= gangsterBonus;
+            if (stakedGangsters == 1) {
+                
+                tokenIdReward[gangsterMap.getKeyAtIndex(0)] += eachGangsterCut;
+            } else {
+                for (uint256 i = 0; i <= stakedGangsters - 1; i++) {
+                    
+                    tokenIdReward[gangsterMap.getKeyAtIndex(i)] += eachGangsterCut;
+                }
+            }
+        }
+
+        if ((chance >= 1 && chance <= 50)) {
+            finalBusinessOwnerReward -= (finalBusinessOwnerReward * (25)) / (100);
+            IERC20(ercAddress).transfer(address(0), (finalBusinessOwnerReward * (25)) / (100));
+            returnedMsgNumber = 2;
+        }
+
+        if (finalBusinessOwnerReward != 0) {
+            lastClaimedReward[claimBORequestQueue[requestId].tokenId] = block.timestamp;
+            tokenIdReward[claimBORequestQueue[requestId].tokenId] = 0;
+            tokensAwarded += finalBusinessOwnerReward;
+            IERC20(ercAddress).transfer(ownerOfDeposit[claimBORequestQueue[requestId].tokenId], finalBusinessOwnerReward);
+        }
+
+        emit EtherJsLogger(returnedMsgNumber, finalBusinessOwnerReward);
+        claimBORequestQueue[requestId].isFullfilled = true;
+
+        return true;
+    }
+
+    function executeGAClaimRequest(uint256 requestId, uint256 randomness) external returns (bool) {
+        if(msg.sender != randomnessProviderV2) revert Unauthorized();
+        if(claimGARequestQueue[requestId].isFullfilled == true) revert Unauthorized();
+
+        uint256 returnedMsgNumber = 1;
+        uint256 chance = (randomness % 100) + 1;
+        uint256 finalGangsterReward = tokenIdReward[claimGARequestQueue[requestId].tokenId];
+
+        if ((chance >= 1 && chance <= 50)) {
+            finalGangsterReward -= (finalGangsterReward * (25)) / (100);
+            returnedMsgNumber = 2;
+        }
+
+        if (finalGangsterReward != 0) {
+            lastClaimedReward[claimGARequestQueue[requestId].tokenId] = block.timestamp;
+            tokenIdReward[claimGARequestQueue[requestId].tokenId] = 0;
+            tokensAwarded += finalGangsterReward;
+            IERC20(ercAddress).transfer(ownerOfDeposit[claimGARequestQueue[requestId].tokenId], finalGangsterReward);
+        }
+
+        emit EtherJsLogger(returnedMsgNumber, finalGangsterReward);
+        claimGARequestQueue[requestId].isFullfilled = true;
+        return true;
+        
+    }
+
+    function changeERCNFTAddr(address ercAddr, address nftAddr)
+        external
+        onlyOwner
+    {
+        require(ercAddr != address(0) && nftAddr != address(0));
+
+        ercAddress = ercAddr;
+        nftAddress = nftAddr;
+
+        emit ErcNftAddressChanged(ercAddr, nftAddr);
+    }
+
+    function changeStakingEnabled(bool value) external onlyOwner {
+        isStakingEnabled = value;
+        emit StakingEnabledChanged(value);
+    }
+
+    function getRandomStakedGangsterOwnerAddr(
+    ) external view returns (address) {
+
+        // If we dont use this simplified version of RNG Contract will be too large to compile
+
+        if (stakedGangsters > 0) {
+            uint256 key1 = gangsterMap.getKeyAtIndex(
+                ((uint256(keccak256(abi.encodePacked(block.difficulty, block.timestamp))) % stakedGangsters) + 1) - 1
+            );
+            return ownerOfDeposit[key1];
+        }
+
+        return address(0);
+    }
+
+    function getWorkerTimeLockReward(uint256 tokenId)
+        public
+        view
+        returns (uint256)
+    {
+        if (ownerOfDeposit[tokenId] == address(0)) return 0;
+
+        uint256 timeStackedForTokenId = block.timestamp -
+            lastClaimedReward[tokenId];
+        uint256 currentTimeLockReward = (((timeStackedForTokenId * (100000)) /
+            dayTimeInSeconds) *
+            5000 *
+            1 ether) / (100000);
+
+        return currentTimeLockReward;
+    }
+
+    function getTotalStakedNFTs() external view returns (uint256) {
+        return
+            stakedWorkers +
+            stakedLandlords +
+            stakedBusinessOwners +
+            stakedGangsters;
+    }
+
+
+    function stakeNft(uint256 tokenId) external returns (bool) {
+        if (isStakingEnabled == false) revert Unauthorized();
+
+        lastClaimedReward[tokenId] = block.timestamp;
+        ownerOfDeposit[tokenId] = msg.sender;
+
+        if (IERC721(nftAddress).checkIfWorker(tokenId)) {
+            IERC721(nftAddress).transferFrom(
+                msg.sender,
+                address(this),
+                tokenId
+            );
+            workerMap.set(tokenId, 1);
+            stakedWorkers++;
+            emit WOStaked(tokenId, block.timestamp, msg.sender);
+            return true;
+        }
+        if (IERC721(nftAddress).checkIfLandlord(tokenId)) {
+            IERC721(nftAddress).transferFrom(
+                msg.sender,
+                address(this),
+                tokenId
+            );
+            landlordMap.set(tokenId, 1);
+            stakedLandlords++;
+            emit LLStaked(tokenId, block.timestamp, msg.sender);
+            return true;
+        }
+        if (IERC721(nftAddress).checkIfBusinessOwner(tokenId)) {
+            IERC721(nftAddress).transferFrom(
+                msg.sender,
+                address(this),
+                tokenId
+            );
+            businessOwnerMap.set(tokenId, 1);
+            stakedBusinessOwners++;
+            emit BOStaked(tokenId, block.timestamp, msg.sender);
+            return true;
+        }
+        if (IERC721(nftAddress).checkIfGangster(tokenId)) {
+            IERC721(nftAddress).transferFrom(
+                msg.sender,
+                address(this),
+                tokenId
+            );
+            gangsterMap.set(tokenId, 1);
+            stakedGangsters++;
+            emit GAStaked(tokenId, block.timestamp, msg.sender);
+            return true;
+        }
+
+        revert();
+    }
+
+
+    function claimRewardWorker(uint256 tokenId) external returns (uint256) {
+        if (hasContractAwardedAllTokens()) revert AllTokensAwarded();
+
+        if (IERC721(nftAddress).checkIfWorker(tokenId) != true)
+            revert Unauthorized();
+        if (ownerOfDeposit[tokenId] != msg.sender) revert Unauthorized();
+
+        uint256 finalWorkerReward = getWorkerTimeLockReward(tokenId);
+        uint256 finalWorkerRewardCopy = finalWorkerReward;
+
+        // Distribute BO cut 20%
+        if (stakedBusinessOwners > 0) {
+            uint256 businessOwnerBonus = (finalWorkerRewardCopy * (20)) / (100);
+            uint256 eachBusinessOwnerCut = businessOwnerBonus /
+                (stakedBusinessOwners);
+            finalWorkerReward -= businessOwnerBonus;
+            if (stakedBusinessOwners == 1) {
+                uint256 key1 = businessOwnerMap.getKeyAtIndex(0);
+                tokenIdReward[key1] += eachBusinessOwnerCut;
+            } else {
+                for (uint256 i = 0; i <= stakedBusinessOwners - 1; i++) {
+                    uint256 key = businessOwnerMap.getKeyAtIndex(i);
+                    tokenIdReward[key] += eachBusinessOwnerCut;
+                }
+            }
+        }
+
+        // Distribute Landlord cut 15%
+        if (stakedLandlords > 0) {
+            uint256 landlordBonus = (finalWorkerRewardCopy * (15)) / (100);
+            uint256 eachLandlordCut = landlordBonus / (stakedLandlords);
+            finalWorkerReward -= landlordBonus;
+            if (stakedLandlords == 1) {
+                uint256 key1 = landlordMap.getKeyAtIndex(0);
+                tokenIdReward[key1] += eachLandlordCut;
+            } else {
+                for (uint256 i = 0; i <= stakedLandlords - 1; i++) {
+                    uint256 key = landlordMap.getKeyAtIndex(i);
+                    tokenIdReward[key] += eachLandlordCut;
+                }
+            }
+        }
+
+        // Distribute Gangster cut 5%
+        if (stakedGangsters > 0) {
+            uint256 gangsterBonus = (finalWorkerRewardCopy * (5)) / (100);
+            uint256 eachGangsterCut = gangsterBonus / (stakedGangsters);
+            finalWorkerReward -= gangsterBonus;
+            if (stakedGangsters == 1) {
+                uint256 key1 = gangsterMap.getKeyAtIndex(0);
+                tokenIdReward[key1] += eachGangsterCut;
+            } else {
+                for (uint256 i = 0; i <= stakedGangsters - 1; i++) {
+                    uint256 key = gangsterMap.getKeyAtIndex(i);
+                    tokenIdReward[key] += eachGangsterCut;
+                }
+            }
+        }
+
+        if (finalWorkerReward != 0) {
+            lastClaimedReward[tokenId] = block.timestamp;
+            tokenIdReward[tokenId] = 0;
+            tokensAwarded += finalWorkerReward;
+            IERC20(ercAddress).transfer(ownerOfDeposit[tokenId], finalWorkerReward);
+        }
+
+        emit EtherJsLogger(1, finalWorkerReward);
+        return finalWorkerReward;
+    }
+
+    function unstakeWorker(
+        uint256 tokenId
+    ) external returns (bool) {
+
+        uint256 finalWorkerReward = getWorkerTimeLockReward(tokenId);
+
+        if (ownerOfDeposit[tokenId] != msg.sender) revert Unauthorized();
+        if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
+            revert Unauthorized();
+        if (IERC721(nftAddress).checkIfWorker(tokenId) != true)
+            revert Unauthorized();
+
+        if (hasContractAwardedAllTokens()) {
+            IERC721(nftAddress).safeTransferFrom(
+                address(this),
+                ownerOfDeposit[tokenId],
+                tokenId
+            );
+            emit WOUnstaked(tokenId, block.timestamp, ownerOfDeposit[tokenId]);
+            return true;
+        }
+
+        if (finalWorkerReward < 10000 * 1 ether) revert InsufficientFunds();
+
+        uint256 requestId = unstakeWORequestQueue.length;
+
+        unstakeWORequestQueue.push(
+            Request(
+                requestId,
+                tokenId,
+                0,
+                false
+            )
+        );
+
+        emit WOUnstakeRequest(requestId, tokenId);
+        return true;
+    }
+
+    function claimRewardLandlord(uint256 tokenId) external returns (bool) {
+
+        uint256 finalLandlordReward = tokenIdReward[tokenId];
+
+        if (hasContractAwardedAllTokens()) revert AllTokensAwarded();
+        if (IERC721(nftAddress).checkIfLandlord(tokenId) != true)
+            revert Unauthorized();
+        if (ownerOfDeposit[tokenId] != msg.sender) revert Unauthorized();
+        if (finalLandlordReward < 25000 * 1 ether) revert InsufficientFunds();
+
+        // Distribute Gangster cut 5%
+        if (stakedGangsters > 0) {
+            uint256 gangsterBonus = (finalLandlordReward * (5)) / (100);
+            uint256 eachGangsterCut = gangsterBonus / (stakedGangsters);
+            finalLandlordReward -= gangsterBonus;
+            if (stakedGangsters == 1) {
+                uint256 key1 = gangsterMap.getKeyAtIndex(0);
+                tokenIdReward[key1] += eachGangsterCut;
+            } else {
+                for (uint256 i = 0; i <= stakedGangsters - 1; i++) {
+                    uint256 key = gangsterMap.getKeyAtIndex(i);
+                    tokenIdReward[key] += eachGangsterCut;
+                }
+            }
+        }
+
+        if (finalLandlordReward != 0) {
+            lastClaimedReward[tokenId] = block.timestamp;
+            tokenIdReward[tokenId] = 0;
+            tokensAwarded += finalLandlordReward;
+            IERC20(ercAddress).transfer(ownerOfDeposit[tokenId], finalLandlordReward);
+        }
+
+        emit EtherJsLogger(1, finalLandlordReward);
+
+        return true;
+    }
+
+    function unstakeLandlord(
+        uint256 tokenId
+    ) external returns (bool) {
+        uint256 finalLandlordReward = tokenIdReward[tokenId];
+
+        if (ownerOfDeposit[tokenId] != msg.sender) revert Unauthorized();
+
+        if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
+            revert Unauthorized();
+
+        if (IERC721(nftAddress).checkIfLandlord(tokenId) != true)
+            revert Unauthorized();
+
+        if (finalLandlordReward < 25000 * 1 ether) revert InsufficientFunds();
+
+        if (hasContractAwardedAllTokens()) {
+            IERC721(nftAddress).safeTransferFrom(
+                address(this),
+                ownerOfDeposit[tokenId],
+                tokenId
+            );
+            emit LLUnstaked(tokenId, block.timestamp, ownerOfDeposit[tokenId]);
+            return true;
+        }
+
+        uint256 requestId = unstakeLLRequestQueue.length;
+
+        unstakeLLRequestQueue.push(
+            Request(
+                requestId,
+                tokenId,
+                0,
+                false
+            )
+        );
+
+        emit LLUnstakeRequest(requestId, tokenId);
+        return true;
+    }
+
+    function claimRewardBusinessOwner(
+        uint256 tokenId
+    ) external returns (bool) {
+
+        uint256 finalBusinessOwnerReward = tokenIdReward[tokenId];
+
+        if (hasContractAwardedAllTokens()) revert AllTokensAwarded();
+
+        if (IERC721(nftAddress).checkIfBusinessOwner(tokenId) != true)
+            revert Unauthorized();
+        if (ownerOfDeposit[tokenId] != msg.sender) revert Unauthorized();
+        if (finalBusinessOwnerReward < 50000 * 1 ether) revert Unauthorized();
+
+        uint256 requestId = claimBORequestQueue.length;
+
+        claimBORequestQueue.push(
+            Request(
+                requestId,
+                tokenId,
+                0,
+                false
+            )
+        );
+
+        emit BOClaimRequest(requestId, tokenId);
+
+        return true;
+    }
+
+    function unstakeBusinessOwner(
+        uint256 tokenId
+    ) external returns (bool) {
+        uint256 finalBusinessOwnerReward = tokenIdReward[tokenId];
+
+        if (finalBusinessOwnerReward < 50000 * 1 ether)
+            revert InsufficientFunds();
+
+        if (ownerOfDeposit[tokenId] != msg.sender) revert Unauthorized();
+
+        if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
+            revert Unauthorized();
+
+        if (IERC721(nftAddress).checkIfBusinessOwner(tokenId) != true)
+            revert Unauthorized();
+
+        if (hasContractAwardedAllTokens()) {
+            IERC721(nftAddress).safeTransferFrom(
+                address(this),
+                ownerOfDeposit[tokenId],
+                tokenId
+            );
+            emit BOUnstaked(tokenId, block.timestamp, ownerOfDeposit[tokenId]);
+            return true;
+        }
+
+        uint256 requestId = unstakeBORequestQueue.length;
+
+        unstakeBORequestQueue.push(
+            Request(
+                requestId,
+                tokenId,
+                0,
+                false
+            )
+        );
+
+        emit BOUnstakeRequest(requestId, tokenId);
+
+        return true;
+    }
+
+    function claimRewardGangster(
+        uint256 tokenId
+    ) external returns (bool) {
+        if (hasContractAwardedAllTokens()) revert AllTokensAwarded();
+
+        uint256 finalGangsterReward = tokenIdReward[tokenId];
+
+        if (IERC721(nftAddress).checkIfGangster(tokenId) != true)
+            revert Unauthorized();
+        if (ownerOfDeposit[tokenId] != msg.sender) revert Unauthorized();
+        if (finalGangsterReward < 75000 * 1 ether) revert InsufficientFunds();
+
+        uint256 requestId = claimGARequestQueue.length;
+
+        claimGARequestQueue.push(
+            Request(
+                requestId,
+                tokenId,
+                0,
+                false
+            )
+        );
+
+        emit GAClaimRequest(requestId, tokenId);
+
+        return true;
+    }
+
+    function unstakeGangster(
+        uint256 tokenId
+    ) external returns (bool) {
+
+        uint256 finalGangsterReward = tokenIdReward[tokenId];
+
+        if (ownerOfDeposit[tokenId] != msg.sender) revert Unauthorized();
+
+        if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
+            revert Unauthorized();
+
+        if (IERC721(nftAddress).checkIfGangster(tokenId) != true)
+            revert Unauthorized();
+
+
+        if (finalGangsterReward < 75000 * 1 ether) revert InsufficientFunds();
+
+        uint256 requestId = unstakeGARequestQueue.length;
+
+        unstakeGARequestQueue.push(
+            Request(
+                requestId,
+                tokenId,
+                0,
+                false
+            )
+        );
+
+        emit GAUnstakeRequest(requestId, tokenId);
+
+        return true;
+    }
+}

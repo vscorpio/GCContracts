@@ -16,7 +16,7 @@ contract OnChainProperties {
 }
 
 interface StakingInterface {
-   function getRandomStakedGangsterOwnerAddr(uint256 randomness,  uint8 v, bytes32 r, bytes32 s) external view returns (address);
+   function getRandomStakedGangsterOwnerAddr() external view returns (address);
 }
 
 contract GangsterCityNFT is RoyaltiesAddon, ERC2981, OnChainProperties, Ownable {
@@ -227,6 +227,7 @@ contract GangsterCityNFT is RoyaltiesAddon, ERC2981, OnChainProperties, Ownable 
         return (res);
     }
 
+
     function createNft(
         string memory tokenURI,
         uint8 v,
@@ -288,7 +289,7 @@ contract GangsterCityNFT is RoyaltiesAddon, ERC2981, OnChainProperties, Ownable 
         uint256 shouldTransferToGangster = strToUint(normalSubstring(tokenURI, 0, 1)); // first number in the signed message (0 - do not transfer | 1 - transfer)
         uint256 selectedClass = strToUint(normalSubstring(tokenURI, 1, 2)); // second number in the signed message (1 - worker | 2 - landlord | 3 - business owner | 4 - gangster)
 
-        require(shouldTransferToGangster >= 1 && shouldTransferToGangster <= 2);
+        require(shouldTransferToGangster >= 0 && shouldTransferToGangster <= 1);
         require(selectedClass >= 1 && selectedClass <= 4);
 
         if (selectedClass == 1) isWorker[newItemId] = true;
@@ -296,7 +297,7 @@ contract GangsterCityNFT is RoyaltiesAddon, ERC2981, OnChainProperties, Ownable 
         if (selectedClass == 3) isBusinessOwner[newItemId] = true;
         if (selectedClass == 4) isGangster[newItemId] = true;
 
-        address randomGangsterAddress = StakingInterface(stakingAddress).getRandomStakedGangsterOwnerAddr(randomness, v2, r2, s2);
+        address randomGangsterAddress = StakingInterface(stakingAddress).getRandomStakedGangsterOwnerAddr();
 
         if(_tokenIds.current() > 10000 && shouldTransferToGangster == 1 && randomGangsterAddress != address(0))
         {
