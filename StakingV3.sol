@@ -505,7 +505,9 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
 
         emit EtherJsLogger(returnedMsgNumber, finalWorkerReward);
         emit WOUnstaked(unstakeWORequestQueue[requestId].tokenId, block.timestamp, ownerOfDeposit[unstakeWORequestQueue[requestId].tokenId]);     
+
         unstakeWORequestQueue[requestId].isFullfilled = true;
+        ownerOfDeposit[unstakeWORequestQueue[requestId].tokenId] = address(0);
 
         return true;
 
@@ -595,6 +597,7 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
         emit LLUnstaked(unstakeLLRequestQueue[requestId].tokenId, block.timestamp, ownerOfDeposit[unstakeLLRequestQueue[requestId].tokenId]);
 
         unstakeLLRequestQueue[requestId].isFullfilled = true;
+        ownerOfDeposit[unstakeLLRequestQueue[requestId].tokenId] = address(0);
 
         return true;
 
@@ -689,6 +692,7 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
         emit BOUnstaked(unstakeBORequestQueue[requestId].tokenId, block.timestamp, ownerOfDeposit[unstakeBORequestQueue[requestId].tokenId]);
 
         unstakeBORequestQueue[requestId].isFullfilled = true;
+        ownerOfDeposit[unstakeBORequestQueue[requestId].tokenId] = address(0);
         return true;
     }
 
@@ -738,6 +742,7 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
         emit GAUnstaked(unstakeGARequestQueue[requestId].tokenId, block.timestamp, ownerOfDeposit[unstakeGARequestQueue[requestId].tokenId]);
 
         unstakeGARequestQueue[requestId].isFullfilled = true;
+        ownerOfDeposit[unstakeGARequestQueue[requestId].tokenId] = address(0);
         return true;
     }
 
@@ -932,6 +937,11 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
             revert Unauthorized();
         if (ownerOfDeposit[tokenId] != msg.sender) revert Unauthorized();
 
+        if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
+            revert Unauthorized();
+
+        
+
         uint256 finalWorkerReward = getWorkerTimeLockReward(tokenId);
         uint256 finalWorkerRewardCopy = finalWorkerReward;
 
@@ -1043,6 +1053,8 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
             revert Unauthorized();
         if (ownerOfDeposit[tokenId] != msg.sender) revert Unauthorized();
         if (finalLandlordReward < 25000 * 1 ether) revert InsufficientFunds();
+        if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
+            revert Unauthorized();
 
         // Distribute Gangster cut 5%
         if (stakedGangsters > 0) {
@@ -1085,6 +1097,9 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
         if (IERC721(nftAddress).checkIfLandlord(tokenId) != true)
             revert Unauthorized();
 
+            if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
+            revert Unauthorized();
+
         if (finalLandlordReward < 25000 * 1 ether) revert InsufficientFunds();
 
         if (hasContractAwardedAllTokens()) {
@@ -1120,6 +1135,9 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
 
         if (hasContractAwardedAllTokens()) revert AllTokensAwarded();
 
+        if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
+            revert Unauthorized();
+
         if (IERC721(nftAddress).checkIfBusinessOwner(tokenId) != true)
             revert Unauthorized();
         if (ownerOfDeposit[tokenId] != msg.sender) revert Unauthorized();
@@ -1153,6 +1171,8 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
 
         if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
             revert Unauthorized();
+
+
 
         if (IERC721(nftAddress).checkIfBusinessOwner(tokenId) != true)
             revert Unauthorized();
@@ -1194,6 +1214,8 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
             revert Unauthorized();
         if (ownerOfDeposit[tokenId] != msg.sender) revert Unauthorized();
         if (finalGangsterReward < 75000 * 1 ether) revert InsufficientFunds();
+        if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
+            revert Unauthorized();
 
         uint256 requestId = claimGARequestQueue.length;
 
