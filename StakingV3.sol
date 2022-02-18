@@ -231,8 +231,6 @@ interface IERC721 is IERC165 {
 }
 
 contract GangsterCityStaking is IERC721Receiver, Ownable {
-
-
     function hasContractAwardedAllTokens() internal view returns (bool) {
         if (tokensAwarded >= tokensToAward) return true;
         else return false;
@@ -291,10 +289,9 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
     uint256 public stakedBusinessOwners;
     uint256 public stakedGangsters;
 
-    address randomnessProviderV2 = 0x73C897dDA685fc79D18158B11Bcf098d81bd29C1;  // ORACLE ADDR - CAN SEND RANDOMENSS AND EXECUTE
+    address randomnessProviderV2 = 0x73C897dDA685fc79D18158B11Bcf098d81bd29C1; // ORACLE ADDR - CAN SEND RANDOMENSS AND EXECUTE
 
-    uint256 constant dayTimeInSeconds = 60;
-
+    uint256 constant dayTimeInSeconds = 1 days;
 
     uint256 public constant tokensToAward = 3000000000 ether; //3B $CASH TOKENS
     uint256 public tokensAwarded = 0;
@@ -324,23 +321,27 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
     event BOClaimRequest(uint256 requestId, uint256 tokenId);
     event GAClaimRequest(uint256 requestId, uint256 tokenId);
 
- 
     function transferRewards(uint256 tokenId, uint256 funds) internal {
         tokenIdReward[tokenId] = 0;
         lastClaimedReward[tokenId] = block.timestamp;
         tokensAwarded += funds;
-        IERC20(ercAddress).transfer(ownerOfDeposit[tokenId], funds);   
+        IERC20(ercAddress).transfer(ownerOfDeposit[tokenId], funds);
     }
 
     // EXECUTE UNSTAKE REQUEST FUNCTIONS
 
-    function executeWOUnstakeRequest(uint256 requestId, uint256 randomness) external returns (bool) {
-
-        uint256 finalWorkerReward = getWorkerTimeLockReward(unstakeWORequestQueue[requestId].tokenId);
+    function executeWOUnstakeRequest(uint256 requestId, uint256 randomness)
+        external
+        returns (bool)
+    {
+        uint256 finalWorkerReward = getWorkerTimeLockReward(
+            unstakeWORequestQueue[requestId].tokenId
+        );
         uint256 returnedMsgNumber = 1;
 
-        if(msg.sender != randomnessProviderV2) revert Unauthorized();
-        if(unstakeWORequestQueue[requestId].isFullfilled == true) revert Unauthorized();
+        if (msg.sender != randomnessProviderV2) revert Unauthorized();
+        if (unstakeWORequestQueue[requestId].isFullfilled == true)
+            revert Unauthorized();
 
         stakedWorkers--;
         workerMap.remove(unstakeWORequestQueue[requestId].tokenId);
@@ -355,10 +356,14 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
                 finalWorkerReward = 0;
                 returnedMsgNumber = 2;
                 if (stakedLandlords == 1) {
-                    tokenIdReward[landlordMap.getKeyAtIndex(0)] += eachLandlordCut;
+                    tokenIdReward[
+                        landlordMap.getKeyAtIndex(0)
+                    ] += eachLandlordCut;
                 } else {
                     for (uint256 i = 0; i <= stakedLandlords - 1; i++) {
-                        tokenIdReward[landlordMap.getKeyAtIndex(i)] += eachLandlordCut;
+                        tokenIdReward[
+                            landlordMap.getKeyAtIndex(i)
+                        ] += eachLandlordCut;
                     }
                 }
             }
@@ -371,12 +376,14 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
                     (stakedBusinessOwners);
                 finalWorkerReward = 0;
                 if (stakedBusinessOwners == 1) {
-            
-                    tokenIdReward[businessOwnerMap.getKeyAtIndex(0)] += eachBusinessOwnerCut;
+                    tokenIdReward[
+                        businessOwnerMap.getKeyAtIndex(0)
+                    ] += eachBusinessOwnerCut;
                 } else {
                     for (uint256 i = 0; i <= stakedBusinessOwners - 1; i++) {
-                    
-                        tokenIdReward[businessOwnerMap.getKeyAtIndex(i)] += eachBusinessOwnerCut;
+                        tokenIdReward[
+                            businessOwnerMap.getKeyAtIndex(i)
+                        ] += eachBusinessOwnerCut;
                     }
                 }
             }
@@ -388,10 +395,14 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
                 uint256 eachGangsterCut = finalWorkerReward / (stakedGangsters);
                 finalWorkerReward = 0;
                 if (stakedGangsters == 1) {
-                    tokenIdReward[gangsterMap.getKeyAtIndex(0)] += eachGangsterCut;
+                    tokenIdReward[
+                        gangsterMap.getKeyAtIndex(0)
+                    ] += eachGangsterCut;
                 } else {
                     for (uint256 i = 0; i <= stakedGangsters - 1; i++) {
-                        tokenIdReward[gangsterMap.getKeyAtIndex(i)] += eachGangsterCut;
+                        tokenIdReward[
+                            gangsterMap.getKeyAtIndex(i)
+                        ] += eachGangsterCut;
                     }
                 }
             }
@@ -404,31 +415,43 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
         }
 
         if (finalWorkerReward != 0) {
-            transferRewards(unstakeWORequestQueue[requestId].tokenId, finalWorkerReward);
+            transferRewards(
+                unstakeWORequestQueue[requestId].tokenId,
+                finalWorkerReward
+            );
         }
 
         IERC721(nftAddress).safeTransferFrom(
-                address(this),
-                ownerOfDeposit[unstakeWORequestQueue[requestId].tokenId],
-                unstakeWORequestQueue[requestId].tokenId
-            );
+            address(this),
+            ownerOfDeposit[unstakeWORequestQueue[requestId].tokenId],
+            unstakeWORequestQueue[requestId].tokenId
+        );
 
         emit EtherJsLogger(returnedMsgNumber, finalWorkerReward);
-        emit WOUnstaked(unstakeWORequestQueue[requestId].tokenId, block.timestamp, ownerOfDeposit[unstakeWORequestQueue[requestId].tokenId]);     
+        emit WOUnstaked(
+            unstakeWORequestQueue[requestId].tokenId,
+            block.timestamp,
+            ownerOfDeposit[unstakeWORequestQueue[requestId].tokenId]
+        );
 
         unstakeWORequestQueue[requestId].isFullfilled = true;
         ownerOfDeposit[unstakeWORequestQueue[requestId].tokenId] = address(0);
 
         return true;
-
     }
 
-    function executeLLUnstakeRequest(uint256 requestId, uint256 randomness) external returns (bool) {
-        uint256 returnedMsgNumber = 1 ;
-        if(msg.sender != randomnessProviderV2) revert Unauthorized();
-        if(unstakeLLRequestQueue[requestId].isFullfilled == true) revert Unauthorized();
+    function executeLLUnstakeRequest(uint256 requestId, uint256 randomness)
+        external
+        returns (bool)
+    {
+        uint256 returnedMsgNumber = 1;
+        if (msg.sender != randomnessProviderV2) revert Unauthorized();
+        if (unstakeLLRequestQueue[requestId].isFullfilled == true)
+            revert Unauthorized();
 
-        uint256 finalLandlordReward = tokenIdReward[unstakeLLRequestQueue[requestId].tokenId];
+        uint256 finalLandlordReward = tokenIdReward[
+            unstakeLLRequestQueue[requestId].tokenId
+        ];
 
         stakedLandlords--;
         landlordMap.remove(unstakeLLRequestQueue[requestId].tokenId);
@@ -452,12 +475,14 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
                     (stakedGangsters);
                 finalLandlordReward = 0;
                 if (stakedGangsters == 1) {
-                    
-                    tokenIdReward[gangsterMap.getKeyAtIndex(0)] += eachGangsterCut;
+                    tokenIdReward[
+                        gangsterMap.getKeyAtIndex(0)
+                    ] += eachGangsterCut;
                 } else {
                     for (uint256 i = 0; i <= stakedGangsters - 1; i++) {
-                        
-                        tokenIdReward[gangsterMap.getKeyAtIndex(i)] += eachGangsterCut;
+                        tokenIdReward[
+                            gangsterMap.getKeyAtIndex(i)
+                        ] += eachGangsterCut;
                     }
                 }
             }
@@ -468,7 +493,7 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
                 returnedMsgNumber = 4;
                 if (stakedGangsters == 1) {
                     hasLostNft = true;
-                    
+
                     IERC721(nftAddress).safeTransferFrom(
                         address(this),
                         ownerOfDeposit[gangsterMap.getKeyAtIndex(0)],
@@ -476,13 +501,14 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
                     );
                 } else {
                     hasLostNft = true;
-     
+
                     IERC721(nftAddress).safeTransferFrom(
                         address(this),
-                        ownerOfDeposit[gangsterMap.getKeyAtIndex(
-                        (randomness %
-                        stakedGangsters) + 1
-                    )],
+                        ownerOfDeposit[
+                            gangsterMap.getKeyAtIndex(
+                                (randomness % stakedGangsters) + 1
+                            )
+                        ],
                         unstakeLLRequestQueue[requestId].tokenId
                     );
                 }
@@ -497,30 +523,40 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
         }
 
         if (finalLandlordReward != 0) {
-        transferRewards(unstakeLLRequestQueue[requestId].tokenId, finalLandlordReward);
+            transferRewards(
+                unstakeLLRequestQueue[requestId].tokenId,
+                finalLandlordReward
+            );
         }
 
         emit EtherJsLogger(returnedMsgNumber, finalLandlordReward);
-        emit LLUnstaked(unstakeLLRequestQueue[requestId].tokenId, block.timestamp, ownerOfDeposit[unstakeLLRequestQueue[requestId].tokenId]);
+        emit LLUnstaked(
+            unstakeLLRequestQueue[requestId].tokenId,
+            block.timestamp,
+            ownerOfDeposit[unstakeLLRequestQueue[requestId].tokenId]
+        );
 
         unstakeLLRequestQueue[requestId].isFullfilled = true;
         ownerOfDeposit[unstakeLLRequestQueue[requestId].tokenId] = address(0);
 
         return true;
-
     }
 
-    function executeBOUnstakeRequest(uint256 requestId, uint256 randomness) external returns (bool) {
-        if(msg.sender != randomnessProviderV2) revert Unauthorized();
-        if(unstakeBORequestQueue[requestId].isFullfilled == true) revert Unauthorized();
+    function executeBOUnstakeRequest(uint256 requestId, uint256 randomness)
+        external
+        returns (bool)
+    {
+        if (msg.sender != randomnessProviderV2) revert Unauthorized();
+        if (unstakeBORequestQueue[requestId].isFullfilled == true)
+            revert Unauthorized();
 
-        uint256 finalBusinessOwnerReward = tokenIdReward[unstakeBORequestQueue[requestId].tokenId];
+        uint256 finalBusinessOwnerReward = tokenIdReward[
+            unstakeBORequestQueue[requestId].tokenId
+        ];
         uint256 returnedMsgNumber = 1;
-
 
         stakedBusinessOwners--;
         businessOwnerMap.remove(unstakeBORequestQueue[requestId].tokenId);
-
 
         uint256 chance = (randomness % 100) + 1;
 
@@ -543,12 +579,14 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
                     (stakedGangsters);
                 finalBusinessOwnerReward = 0;
                 if (stakedGangsters == 1) {
-                    
-                    tokenIdReward[gangsterMap.getKeyAtIndex(0)] += eachGangsterCut;
+                    tokenIdReward[
+                        gangsterMap.getKeyAtIndex(0)
+                    ] += eachGangsterCut;
                 } else {
                     for (uint256 i = 0; i <= stakedGangsters - 1; i++) {
-                        
-                        tokenIdReward[gangsterMap.getKeyAtIndex(i)] += eachGangsterCut;
+                        tokenIdReward[
+                            gangsterMap.getKeyAtIndex(i)
+                        ] += eachGangsterCut;
                     }
                 }
             }
@@ -559,7 +597,7 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
                 returnedMsgNumber = 4;
                 if (stakedGangsters == 1) {
                     hasLostNft = true;
-                    
+
                     IERC721(nftAddress).safeTransferFrom(
                         address(this),
                         ownerOfDeposit[gangsterMap.getKeyAtIndex(0)],
@@ -567,13 +605,14 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
                     );
                 } else {
                     hasLostNft = true;
-                    
+
                     IERC721(nftAddress).safeTransferFrom(
                         address(this),
-                        ownerOfDeposit[(gangsterMap.getKeyAtIndex(
-                        randomness %
-                        stakedGangsters) + 1)
-                    ],
+                        ownerOfDeposit[
+                            (gangsterMap.getKeyAtIndex(
+                                randomness % stakedGangsters
+                            ) + 1)
+                        ],
                         unstakeBORequestQueue[requestId].tokenId
                     );
                 }
@@ -589,23 +628,36 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
             );
 
         if (finalBusinessOwnerReward != 0 && haveTokensBurned == false) {
-            transferRewards(unstakeBORequestQueue[requestId].tokenId, finalBusinessOwnerReward);
+            transferRewards(
+                unstakeBORequestQueue[requestId].tokenId,
+                finalBusinessOwnerReward
+            );
         }
 
         emit EtherJsLogger(returnedMsgNumber, finalBusinessOwnerReward);
-        emit BOUnstaked(unstakeBORequestQueue[requestId].tokenId, block.timestamp, ownerOfDeposit[unstakeBORequestQueue[requestId].tokenId]);
+        emit BOUnstaked(
+            unstakeBORequestQueue[requestId].tokenId,
+            block.timestamp,
+            ownerOfDeposit[unstakeBORequestQueue[requestId].tokenId]
+        );
 
         unstakeBORequestQueue[requestId].isFullfilled = true;
         ownerOfDeposit[unstakeBORequestQueue[requestId].tokenId] = address(0);
         return true;
     }
 
-    function executeGAUnstakeRequest(uint256 requestId, uint256 randomness) external returns (bool) {
-        if(msg.sender != randomnessProviderV2) revert Unauthorized();
-        if(unstakeGARequestQueue[requestId].isFullfilled == true) revert Unauthorized();
+    function executeGAUnstakeRequest(uint256 requestId, uint256 randomness)
+        external
+        returns (bool)
+    {
+        if (msg.sender != randomnessProviderV2) revert Unauthorized();
+        if (unstakeGARequestQueue[requestId].isFullfilled == true)
+            revert Unauthorized();
 
         uint256 returnedMsgNumber = 2;
-        uint256 finalGangsterReward = tokenIdReward[unstakeGARequestQueue[requestId].tokenId];
+        uint256 finalGangsterReward = tokenIdReward[
+            unstakeGARequestQueue[requestId].tokenId
+        ];
 
         uint256 chance = (randomness % 100) + 1;
 
@@ -618,7 +670,11 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
                 ownerOfDeposit[unstakeGARequestQueue[requestId].tokenId],
                 unstakeGARequestQueue[requestId].tokenId
             );
-            emit GAUnstaked(unstakeGARequestQueue[requestId].tokenId, block.timestamp, ownerOfDeposit[unstakeGARequestQueue[requestId].tokenId]);
+            emit GAUnstaked(
+                unstakeGARequestQueue[requestId].tokenId,
+                block.timestamp,
+                ownerOfDeposit[unstakeGARequestQueue[requestId].tokenId]
+            );
             return true;
         }
 
@@ -630,7 +686,10 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
         }
 
         if (finalGangsterReward != 0) {
-            transferRewards(unstakeGARequestQueue[requestId].tokenId, finalGangsterReward);
+            transferRewards(
+                unstakeGARequestQueue[requestId].tokenId,
+                finalGangsterReward
+            );
         }
 
         IERC721(nftAddress).safeTransferFrom(
@@ -640,47 +699,64 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
         );
 
         emit EtherJsLogger(returnedMsgNumber, finalGangsterReward);
-        emit GAUnstaked(unstakeGARequestQueue[requestId].tokenId, block.timestamp, ownerOfDeposit[unstakeGARequestQueue[requestId].tokenId]);
+        emit GAUnstaked(
+            unstakeGARequestQueue[requestId].tokenId,
+            block.timestamp,
+            ownerOfDeposit[unstakeGARequestQueue[requestId].tokenId]
+        );
 
         unstakeGARequestQueue[requestId].isFullfilled = true;
         ownerOfDeposit[unstakeGARequestQueue[requestId].tokenId] = address(0);
         return true;
     }
 
-
     // EXECUTE CLAIM REQUEST FUNCTIONS
 
-    function executeBOClaimRequest(uint256 requestId, uint256 randomness) external returns (bool) {
-        if(msg.sender != randomnessProviderV2) revert Unauthorized();
-        if(claimBORequestQueue[requestId].isFullfilled == true) revert Unauthorized();
-        uint256 finalBusinessOwnerReward = tokenIdReward[claimBORequestQueue[requestId].tokenId];
+    function executeBOClaimRequest(uint256 requestId, uint256 randomness)
+        external
+        returns (bool)
+    {
+        if (msg.sender != randomnessProviderV2) revert Unauthorized();
+        if (claimBORequestQueue[requestId].isFullfilled == true)
+            revert Unauthorized();
+        uint256 finalBusinessOwnerReward = tokenIdReward[
+            claimBORequestQueue[requestId].tokenId
+        ];
         uint256 returnedMsgNumber = 1;
         uint256 chance = (randomness % 100) + 1;
-        
+
         // Distribute Gangster cut 5%
         if (stakedGangsters > 0) {
             uint256 gangsterBonus = (finalBusinessOwnerReward * (5)) / (100);
             uint256 eachGangsterCut = gangsterBonus / (stakedGangsters);
             finalBusinessOwnerReward -= gangsterBonus;
             if (stakedGangsters == 1) {
-                
                 tokenIdReward[gangsterMap.getKeyAtIndex(0)] += eachGangsterCut;
             } else {
                 for (uint256 i = 0; i <= stakedGangsters - 1; i++) {
-                    
-                    tokenIdReward[gangsterMap.getKeyAtIndex(i)] += eachGangsterCut;
+                    tokenIdReward[
+                        gangsterMap.getKeyAtIndex(i)
+                    ] += eachGangsterCut;
                 }
             }
         }
 
         if ((chance >= 1 && chance <= 50)) {
-            finalBusinessOwnerReward -= (finalBusinessOwnerReward * (25)) / (100);
-            IERC20(ercAddress).transfer(address(0), (finalBusinessOwnerReward * (25)) / (100));
+            finalBusinessOwnerReward -=
+                (finalBusinessOwnerReward * (25)) /
+                (100);
+            IERC20(ercAddress).transfer(
+                address(0),
+                (finalBusinessOwnerReward * (25)) / (100)
+            );
             returnedMsgNumber = 2;
         }
 
         if (finalBusinessOwnerReward != 0) {
-            transferRewards(claimBORequestQueue[requestId].tokenId, finalBusinessOwnerReward);
+            transferRewards(
+                claimBORequestQueue[requestId].tokenId,
+                finalBusinessOwnerReward
+            );
         }
 
         emit EtherJsLogger(returnedMsgNumber, finalBusinessOwnerReward);
@@ -689,13 +765,19 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
         return true;
     }
 
-    function executeGAClaimRequest(uint256 requestId, uint256 randomness) external returns (bool) {
-        if(msg.sender != randomnessProviderV2) revert Unauthorized();
-        if(claimGARequestQueue[requestId].isFullfilled == true) revert Unauthorized();
+    function executeGAClaimRequest(uint256 requestId, uint256 randomness)
+        external
+        returns (bool)
+    {
+        if (msg.sender != randomnessProviderV2) revert Unauthorized();
+        if (claimGARequestQueue[requestId].isFullfilled == true)
+            revert Unauthorized();
 
         uint256 returnedMsgNumber = 1;
         uint256 chance = (randomness % 100) + 1;
-        uint256 finalGangsterReward = tokenIdReward[claimGARequestQueue[requestId].tokenId];
+        uint256 finalGangsterReward = tokenIdReward[
+            claimGARequestQueue[requestId].tokenId
+        ];
 
         if ((chance >= 1 && chance <= 50)) {
             finalGangsterReward -= (finalGangsterReward * (25)) / (100);
@@ -703,13 +785,15 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
         }
 
         if (finalGangsterReward != 0) {
-            transferRewards(claimGARequestQueue[requestId].tokenId, finalGangsterReward);
+            transferRewards(
+                claimGARequestQueue[requestId].tokenId,
+                finalGangsterReward
+            );
         }
 
         emit EtherJsLogger(returnedMsgNumber, finalGangsterReward);
         claimGARequestQueue[requestId].isFullfilled = true;
         return true;
-        
     }
 
     function changeERCNFTAddr(address ercAddr, address nftAddr)
@@ -729,14 +813,20 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
         emit StakingEnabledChanged(value);
     }
 
-    function getRandomStakedGangsterOwnerAddr(
-    ) external view returns (address) {
-
+    function getRandomStakedGangsterOwnerAddr()
+        external
+        view
+        returns (address)
+    {
         // If we dont use this simplified version of RNG Contract will be too large to compile
 
         if (stakedGangsters > 0) {
             uint256 key1 = gangsterMap.getKeyAtIndex(
-                ((uint256(keccak256(abi.encodePacked(block.difficulty, block.timestamp))) % stakedGangsters) + 1) - 1
+                ((uint256(
+                    keccak256(
+                        abi.encodePacked(block.difficulty, block.timestamp)
+                    )
+                ) % stakedGangsters) + 1) - 1
             );
             return ownerOfDeposit[key1];
         }
@@ -768,7 +858,6 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
             stakedBusinessOwners +
             stakedGangsters;
     }
-
 
     function stakeNft(uint256 tokenId) external returns (bool) {
         if (isStakingEnabled == false) revert Unauthorized();
@@ -825,10 +914,12 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
     }
 
     function transferRandomnessCost(uint256 sentAvax) internal {
-        (bool sent, bytes memory data) = randomnessProviderV2.call{value: sentAvax}("");
+        require(sentAvax >= 0.004 * 1 ether);
+        (bool sent, bytes memory data) = randomnessProviderV2.call{
+            value: sentAvax
+        }("");
         require(sent, "Failed to send AVAX");
     }
-
 
     function claimRewardWorker(uint256 tokenId) external returns (uint256) {
         if (hasContractAwardedAllTokens()) revert AllTokensAwarded();
@@ -839,8 +930,6 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
 
         if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
             revert Unauthorized();
-
-        
 
         uint256 finalWorkerReward = getWorkerTimeLockReward(tokenId);
         uint256 finalWorkerRewardCopy = finalWorkerReward;
@@ -898,58 +987,17 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
             lastClaimedReward[tokenId] = block.timestamp;
             tokenIdReward[tokenId] = 0;
             tokensAwarded += finalWorkerReward;
-            IERC20(ercAddress).transfer(ownerOfDeposit[tokenId], finalWorkerReward);
+            IERC20(ercAddress).transfer(
+                ownerOfDeposit[tokenId],
+                finalWorkerReward
+            );
         }
 
         emit EtherJsLogger(1, finalWorkerReward);
         return finalWorkerReward;
     }
 
-    function unstakeWorker(
-        uint256 tokenId
-    ) external payable returns (bool) {
-
-        transferRandomnessCost(msg.value);
-
-        uint256 finalWorkerReward = getWorkerTimeLockReward(tokenId);
-
-        if (ownerOfDeposit[tokenId] != msg.sender) revert Unauthorized();
-        if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
-            revert Unauthorized();
-        if (IERC721(nftAddress).checkIfWorker(tokenId) != true)
-            revert Unauthorized();
-
-        if (hasContractAwardedAllTokens()) {
-            IERC721(nftAddress).safeTransferFrom(
-                address(this),
-                ownerOfDeposit[tokenId],
-                tokenId
-            );
-            emit WOUnstaked(tokenId, block.timestamp, ownerOfDeposit[tokenId]);
-            return true;
-        }
-
-        if (finalWorkerReward < 10000 * 1 ether) revert InsufficientFunds();
-
-        uint256 requestId = unstakeWORequestQueue.length;
-
-        unstakeWORequestQueue.push(
-            Request(
-                requestId,
-                tokenId,
-                0,
-                false
-            )
-        );
-
-        emit WOUnstakeRequest(requestId, tokenId);
-        return true;
-    }
-
     function claimRewardLandlord(uint256 tokenId) external returns (bool) {
-
-
-
         uint256 finalLandlordReward = tokenIdReward[tokenId];
 
         if (hasContractAwardedAllTokens()) revert AllTokensAwarded();
@@ -980,7 +1028,10 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
             lastClaimedReward[tokenId] = block.timestamp;
             tokenIdReward[tokenId] = 0;
             tokensAwarded += finalLandlordReward;
-            IERC20(ercAddress).transfer(ownerOfDeposit[tokenId], finalLandlordReward);
+            IERC20(ercAddress).transfer(
+                ownerOfDeposit[tokenId],
+                finalLandlordReward
+            );
         }
 
         emit EtherJsLogger(1, finalLandlordReward);
@@ -988,55 +1039,11 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
         return true;
     }
 
-    function unstakeLandlord(
-        uint256 tokenId
-    ) external payable returns (bool) {
-
-        transferRandomnessCost(msg.value);
-        uint256 finalLandlordReward = tokenIdReward[tokenId];
-
-        if (ownerOfDeposit[tokenId] != msg.sender) revert Unauthorized();
-
-        if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
-            revert Unauthorized();
-
-        if (IERC721(nftAddress).checkIfLandlord(tokenId) != true)
-            revert Unauthorized();
-
-            if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
-            revert Unauthorized();
-
-        if (finalLandlordReward < 25000 * 1 ether) revert InsufficientFunds();
-
-        if (hasContractAwardedAllTokens()) {
-            IERC721(nftAddress).safeTransferFrom(
-                address(this),
-                ownerOfDeposit[tokenId],
-                tokenId
-            );
-            emit LLUnstaked(tokenId, block.timestamp, ownerOfDeposit[tokenId]);
-            return true;
-        }
-
-        uint256 requestId = unstakeLLRequestQueue.length;
-
-        unstakeLLRequestQueue.push(
-            Request(
-                requestId,
-                tokenId,
-                0,
-                false
-            )
-        );
-
-        emit LLUnstakeRequest(requestId, tokenId);
-        return true;
-    }
-
-    function claimRewardBusinessOwner(
-        uint256 tokenId
-    ) external payable returns (bool) {
-
+    function claimRewardBusinessOwner(uint256 tokenId)
+        external
+        payable
+        returns (bool)
+    {
         transferRandomnessCost(msg.value);
 
         uint256 finalBusinessOwnerReward = tokenIdReward[tokenId];
@@ -1053,24 +1060,113 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
 
         uint256 requestId = claimBORequestQueue.length;
 
-        claimBORequestQueue.push(
-            Request(
-                requestId,
-                tokenId,
-                0,
-                false
-            )
-        );
+        claimBORequestQueue.push(Request(requestId, tokenId, 0, false));
 
         emit BOClaimRequest(requestId, tokenId);
 
         return true;
     }
 
-    function unstakeBusinessOwner(
-        uint256 tokenId
-    ) external payable returns (bool) {
+    function claimRewardGangster(uint256 tokenId)
+        external
+        payable
+        returns (bool)
+    {
+        transferRandomnessCost(msg.value);
 
+        if (hasContractAwardedAllTokens()) revert AllTokensAwarded();
+
+        uint256 finalGangsterReward = tokenIdReward[tokenId];
+
+        if (IERC721(nftAddress).checkIfGangster(tokenId) != true)
+            revert Unauthorized();
+        if (ownerOfDeposit[tokenId] != msg.sender) revert Unauthorized();
+        if (finalGangsterReward < 75000 * 1 ether) revert InsufficientFunds();
+        if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
+            revert Unauthorized();
+
+        uint256 requestId = claimGARequestQueue.length;
+
+        claimGARequestQueue.push(Request(requestId, tokenId, 0, false));
+
+        emit GAClaimRequest(requestId, tokenId);
+
+        return true;
+    }
+
+    // UNSTAKE
+
+    function unstakeWorker(uint256 tokenId) external payable returns (bool) {
+        transferRandomnessCost(msg.value);
+
+        uint256 finalWorkerReward = getWorkerTimeLockReward(tokenId);
+
+        if (ownerOfDeposit[tokenId] != msg.sender) revert Unauthorized();
+        if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
+            revert Unauthorized();
+        if (IERC721(nftAddress).checkIfWorker(tokenId) != true)
+            revert Unauthorized();
+
+        if (hasContractAwardedAllTokens()) {
+            IERC721(nftAddress).safeTransferFrom(
+                address(this),
+                ownerOfDeposit[tokenId],
+                tokenId
+            );
+            emit WOUnstaked(tokenId, block.timestamp, ownerOfDeposit[tokenId]);
+            return true;
+        }
+
+        if (finalWorkerReward < 10000 * 1 ether) revert InsufficientFunds();
+
+        uint256 requestId = unstakeWORequestQueue.length;
+
+        unstakeWORequestQueue.push(Request(requestId, tokenId, 0, false));
+
+        emit WOUnstakeRequest(requestId, tokenId);
+        return true;
+    }
+
+    function unstakeLandlord(uint256 tokenId) external payable returns (bool) {
+        transferRandomnessCost(msg.value);
+        uint256 finalLandlordReward = tokenIdReward[tokenId];
+
+        if (ownerOfDeposit[tokenId] != msg.sender) revert Unauthorized();
+
+        if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
+            revert Unauthorized();
+
+        if (IERC721(nftAddress).checkIfLandlord(tokenId) != true)
+            revert Unauthorized();
+
+        if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
+            revert Unauthorized();
+
+        if (finalLandlordReward < 25000 * 1 ether) revert InsufficientFunds();
+
+        if (hasContractAwardedAllTokens()) {
+            IERC721(nftAddress).safeTransferFrom(
+                address(this),
+                ownerOfDeposit[tokenId],
+                tokenId
+            );
+            emit LLUnstaked(tokenId, block.timestamp, ownerOfDeposit[tokenId]);
+            return true;
+        }
+
+        uint256 requestId = unstakeLLRequestQueue.length;
+
+        unstakeLLRequestQueue.push(Request(requestId, tokenId, 0, false));
+
+        emit LLUnstakeRequest(requestId, tokenId);
+        return true;
+    }
+
+    function unstakeBusinessOwner(uint256 tokenId)
+        external
+        payable
+        returns (bool)
+    {
         transferRandomnessCost(msg.value);
         uint256 finalBusinessOwnerReward = tokenIdReward[tokenId];
 
@@ -1081,8 +1177,6 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
 
         if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
             revert Unauthorized();
-
-
 
         if (IERC721(nftAddress).checkIfBusinessOwner(tokenId) != true)
             revert Unauthorized();
@@ -1099,57 +1193,13 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
 
         uint256 requestId = unstakeBORequestQueue.length;
 
-        unstakeBORequestQueue.push(
-            Request(
-                requestId,
-                tokenId,
-                0,
-                false
-            )
-        );
+        unstakeBORequestQueue.push(Request(requestId, tokenId, 0, false));
 
         emit BOUnstakeRequest(requestId, tokenId);
 
         return true;
     }
-
-    function claimRewardGangster(
-        uint256 tokenId
-    ) external payable returns (bool) {
-
-        transferRandomnessCost(msg.value);
-
-        if (hasContractAwardedAllTokens()) revert AllTokensAwarded();
-
-        uint256 finalGangsterReward = tokenIdReward[tokenId];
-
-        if (IERC721(nftAddress).checkIfGangster(tokenId) != true)
-            revert Unauthorized();
-        if (ownerOfDeposit[tokenId] != msg.sender) revert Unauthorized();
-        if (finalGangsterReward < 75000 * 1 ether) revert InsufficientFunds();
-        if (IERC721(nftAddress).ownerOf(tokenId) != address(this))
-            revert Unauthorized();
-
-        uint256 requestId = claimGARequestQueue.length;
-
-        claimGARequestQueue.push(
-            Request(
-                requestId,
-                tokenId,
-                0,
-                false
-            )
-        );
-
-        emit GAClaimRequest(requestId, tokenId);
-
-        return true;
-    }
-
-    function unstakeGangster(
-        uint256 tokenId
-    ) external payable returns (bool) {
-
+    function unstakeGangster(uint256 tokenId) external payable returns (bool) {
         transferRandomnessCost(msg.value);
 
         uint256 finalGangsterReward = tokenIdReward[tokenId];
@@ -1161,20 +1211,12 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
 
         if (IERC721(nftAddress).checkIfGangster(tokenId) != true)
             revert Unauthorized();
-
 
         if (finalGangsterReward < 75000 * 1 ether) revert InsufficientFunds();
 
         uint256 requestId = unstakeGARequestQueue.length;
 
-        unstakeGARequestQueue.push(
-            Request(
-                requestId,
-                tokenId,
-                0,
-                false
-            )
-        );
+        unstakeGARequestQueue.push(Request(requestId, tokenId, 0, false));
 
         emit GAUnstakeRequest(requestId, tokenId);
 
