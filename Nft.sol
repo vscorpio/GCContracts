@@ -86,7 +86,7 @@ contract GangsterCityNFT is RoyaltiesAddon, ERC2981, OnChainProperties, Ownable 
         ercAddress = ercAddr;
     }
 
-    address metadataProviderAddress = 0xffF82dd1f43899Aa2F254A4bAFa6c343e97682a7;
+    address metadataProviderAddress = 0x9e4BDC464828B66b07eF826A44ccC42DfDA69b88;
 
     mapping(string => bool) consumedTokenURIs;
     mapping(uint256 => bool) consumedRandomness;
@@ -226,7 +226,6 @@ contract GangsterCityNFT is RoyaltiesAddon, ERC2981, OnChainProperties, Ownable 
         
         return (res);
     }
-
 
     function createNft(
         string memory tokenURI,

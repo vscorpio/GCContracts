@@ -231,6 +231,20 @@ interface IERC721 is IERC165 {
 }
 
 contract GangsterCityStaking is IERC721Receiver, Ownable {
+
+
+    /*
+    -----------------------------------------------------
+    Gangster City Staking | https://thegangstercity.xyz/
+    -----------------------------------------------------
+    Coded by !vscorpio for Gangster City
+    - Discord: !vik#1337
+    - GitHub: https://github.com/vscorpio
+    - Business inquiries: victor.puiu01@gmail.com
+    -----------------------------------------------------
+    */
+
+
     function hasContractAwardedAllTokens() internal view returns (bool) {
         if (tokensAwarded >= tokensToAward) return true;
         else return false;
@@ -289,14 +303,14 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
     uint256 public stakedBusinessOwners;
     uint256 public stakedGangsters;
 
-    address randomnessProviderV2 = 0x73C897dDA685fc79D18158B11Bcf098d81bd29C1; // ORACLE ADDR - CAN SEND RANDOMENSS AND EXECUTE
+    address randomnessProviderV2 = 0x512F7437fc6eeb514B962bB247F645091372f9c0; // ORACLE ADDR - CAN SEND RANDOMENSS AND EXECUTE
 
     uint256 constant dayTimeInSeconds = 1 days;
 
     uint256 public constant tokensToAward = 3000000000 ether; //3B $CASH TOKENS
     uint256 public tokensAwarded = 0;
 
-    bool isStakingEnabled = true;
+    bool isStakingEnabled = false;
 
     struct Request {
         uint256 id;
@@ -914,7 +928,7 @@ contract GangsterCityStaking is IERC721Receiver, Ownable {
     }
 
     function transferRandomnessCost(uint256 sentAvax) internal {
-        require(sentAvax >= 0.004 * 1 ether);
+        require(sentAvax >= 0.007 * 1 ether);
         (bool sent, bytes memory data) = randomnessProviderV2.call{
             value: sentAvax
         }("");
