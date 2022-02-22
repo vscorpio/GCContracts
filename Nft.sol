@@ -77,6 +77,7 @@ contract GangsterCityNFT is RoyaltiesAddon, ERC2981, OnChainProperties, Ownable 
 
     event ErcStakingAddressChanged(address newErcAddress, address newStakingAddress);
     event MintingEnabledChanged(bool status);
+    event NewItemMinted(uint256 tokenId, string tokenURI);
 
     constructor(address ercAddr, address stakingAddr)
         ERC721("Gangster City NFT", "GC-NFT")
@@ -311,6 +312,8 @@ contract GangsterCityNFT is RoyaltiesAddon, ERC2981, OnChainProperties, Ownable 
 
         consumedTokenURIs[tokenURI] = true;
         consumedRandomness[randomness] = true;
+
+        emit NewItemMinted(newItemId, formattedMetadataURI);
 
         return newItemId;
     }
